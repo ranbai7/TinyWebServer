@@ -60,6 +60,7 @@ public:
         FILE_REQUEST,
         INTERNAL_ERROR,
         CLOSED_CONNECTION
+        //UPLOAD_SUCCESS      // 新增
     };
     enum LINE_STATUS
     {
@@ -107,6 +108,11 @@ private:
     bool add_linger();
     bool add_blank_line();
 
+    // 新增：文件上传相关方法
+    HTTP_CODE parse_multipart_content();   // 解析 multipart 请求体
+    bool save_uploaded_file();             // 保存文件到磁盘
+    void init_file_upload_state();         // 重置上传状态
+
 public:
     static int m_epollfd;
     static int m_user_count;
@@ -147,6 +153,13 @@ private:
     char sql_user[100];
     char sql_passwd[100];
     char sql_name[100];
+
+    // ========== 文件上传新增成员变量 ==========
+    bool m_is_file_upload;          // 是否为文件上传请求
+    std::string m_boundary;         // multipart boundary（含 "--" 前缀）
+    std::string m_file_name;        // 上传的文件名
+    std::string m_file_content;     // 文件内容（仅小文件）
+
 };
 
 #endif

@@ -2,6 +2,8 @@
 
 #include <mysql/mysql.h>
 #include <fstream>
+#include <sys/stat.h>
+#include <unistd.h>
 
 //定义http响应的一些状态信息
 const char *ok_200_title = "OK";
@@ -13,6 +15,37 @@ const char *error_404_title = "Not Found";
 const char *error_404_form = "The requested file was not found on this server.\n";
 const char *error_500_title = "Internal Error";
 const char *error_500_form = "There was an unusual problem serving the request file.\n";
+
+// 新增：根据文件扩展名返回 MIME 类型
+static const char* get_mime_type(const char* path)
+{
+    const char* ext = strrchr(path, '.');
+    if (!ext) return "application/octet-stream";
+
+    if (strcasecmp(ext, ".html") == 0 || strcasecmp(ext, ".htm") == 0)
+        return "text/html; charset=utf-8";
+    if (strcasecmp(ext, ".css") == 0)
+        return "text/css; charset=utf-8";
+    if (strcasecmp(ext, ".js") == 0)
+        return "application/javascript";
+    if (strcasecmp(ext, ".jpg") == 0 || strcasecmp(ext, ".jpeg") == 0)
+        return "image/jpeg";
+    if (strcasecmp(ext, ".png") == 0)
+        return "image/png";
+    if (strcasecmp(ext, ".gif") == 0)
+        return "image/gif";
+    if (strcasecmp(ext, ".mp4") == 0)
+        return "video/mp4";
+    if (strcasecmp(ext, ".avi") == 0)
+        return "video/x-msvideo";
+    if (strcasecmp(ext, ".txt") == 0)
+        return "text/plain; charset=utf-8";
+    if (strcasecmp(ext, ".json") == 0)
+        return "application/json";
+    if (strcasecmp(ext, ".ico") == 0)
+        return "image/x-icon";
+    return "application/octet-stream";
+}
 
 locker m_lock;
 map<string, string> users;
@@ -154,9 +187,18 @@ void http_conn::init()
     timer_flag = 0;
     improv = 0;
 
+    // 新增：重置文件上传状态
+    init_file_upload_state();
+    // m_is_file_upload = false;
+    // m_boundary.clear();
+    // m_file_name.clear();
+    // m_file_content.clear();
+
     memset(m_read_buf, '\0', READ_BUFFER_SIZE);
     memset(m_write_buf, '\0', WRITE_BUFFER_SIZE);
     memset(m_real_file, '\0', FILENAME_LEN);
+
+  
 }
 
 //从状态机，用于分析出一行内容
@@ -319,6 +361,29 @@ http_conn::HTTP_CODE http_conn::parse_headers(char *text)
         text += strspn(text, " \t");
         m_host = text;
     }
+    //新增：
+    else if (strncasecmp(text, "Content-Type:", 13) == 0)
+    {
+        text += 13;
+        text += strspn(text, " \t");
+        std::string content_type(text);
+        if (content_type.find("multipart/form-data") != std::string::npos)
+        {
+            m_is_file_upload = true;
+            size_t pos = content_type.find("boundary=");
+            if (pos != std::string::npos)
+            {
+                m_boundary = "--";
+                m_boundary += content_type.substr(pos + 9);
+                // 去除 boundary 可能有的双引号
+                if (m_boundary.size() > 2 && m_boundary[2] == '"' && m_boundary.back() == '"')
+                {
+                    m_boundary = "--" + m_boundary.substr(3, m_boundary.size() - 4);
+                }
+            }
+        }
+    }   
+
     else
     {
         LOG_INFO("oop!unknow header: %s", text);
@@ -387,6 +452,28 @@ http_conn::HTTP_CODE http_conn::process_read()
 
 http_conn::HTTP_CODE http_conn::do_request()
 {
+    // ========== 文件上传处理 ==========
+    if (m_method == POST && m_is_file_upload && strncmp(m_url, "/upload", 7) == 0)
+    {
+        HTTP_CODE ret = parse_multipart_content();
+        if (ret == GET_REQUEST)
+        {
+            if (save_uploaded_file())
+            {
+              strcpy(m_url, "/Upload-Success.html");
+            }
+            else
+            {
+                return BAD_REQUEST;
+            }
+        }
+        else
+        {
+            return BAD_REQUEST;
+        }
+    }
+    // =================================
+
     strcpy(m_real_file, doc_root);
     int len = strlen(doc_root);
     //printf("m_url:%s\n", m_url);
@@ -496,6 +583,17 @@ http_conn::HTTP_CODE http_conn::do_request()
 
         free(m_url_real);
     }
+
+    // ========== 新增：上传页面路由 ==========
+    else if (*(p + 1) == '8')
+    {
+        char *m_url_real = (char *)malloc(sizeof(char) * 200);
+        strcpy(m_url_real, "/upload.html");
+        strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
+        free(m_url_real);
+    }
+    // ======================================
+
     else
         strncpy(m_real_file + len, m_url, FILENAME_LEN - len - 1);
 
@@ -626,6 +724,7 @@ bool http_conn::add_content(const char *content)
 {
     return add_response("%s", content);
 }
+
 bool http_conn::process_write(HTTP_CODE ret)
 {
     switch (ret)
@@ -657,6 +756,11 @@ bool http_conn::process_write(HTTP_CODE ret)
     case FILE_REQUEST:
     {
         add_status_line(200, ok_200_title);
+
+        // ========== 新增：设置正确的 Content-Type ==========
+        add_response("Content-Type: %s\r\n", get_mime_type(m_real_file));
+        // =================================================
+
         if (m_file_stat.st_size != 0)
         {
             add_headers(m_file_stat.st_size);
@@ -676,6 +780,46 @@ bool http_conn::process_write(HTTP_CODE ret)
                 return false;
         }
     }
+
+    //新增：
+    // case UPLOAD_SUCCESS:
+    // {
+    //     // 构造风格一致的上传成功 HTML 页面
+    //     std::string html_body;
+    //     html_body = "<!DOCTYPE html>\r\n";
+    //     html_body += "<html><head><meta charset=\"UTF-8\">";
+    //     html_body += "<title>Upload Success</title></head>\r\n";
+    //     html_body += "<body>\r\n<br/>\r\n<br/>\r\n";
+    //     html_body += "<div align=\"center\"><font size=\"5\">";
+    //     html_body += "<strong>上传成功</strong></font></div>\r\n<br/>\r\n";
+    //     html_body += "<div align=\"center\"><font size=\"4\">";
+    //     html_body += "文件 <strong>" + m_file_name + "</strong> 已成功上传";
+    //     html_body += "</font></div>\r\n<br/>\r\n<br/>\r\n";
+    //     html_body += "<div align=\"center\">\r\n";
+    //     html_body += "<form action=\"8\" method=\"post\">\r\n";
+    //     html_body += "<button type=\"submit\">继续上传</button>\r\n";
+    //     html_body += "</form>\r\n</div>\r\n<br/>\r\n";
+    //     html_body += "<div align=\"center\">\r\n";
+    //     html_body += "<form action=\"5\" method=\"post\">\r\n";
+    //     html_body += "<button type=\"submit\">返回主页</button>\r\n";
+    //     html_body += "</form>\r\n</div>\r\n";
+    //     html_body += "</body>\r\n</html>\r\n";
+
+    //     add_status_line(200, ok_200_title);
+    //     add_response("Content-Type: text/html; charset=utf-8\r\n");
+    //     add_content_length(html_body.length());
+    //     add_linger();
+    //     add_blank_line();
+    //     if (!add_content(html_body.c_str()))
+    //         return false;
+
+    //     m_iv[0].iov_base = m_write_buf;
+    //     m_iv[0].iov_len = m_write_idx;
+    //     m_iv_count = 1;
+    //     bytes_to_send = m_write_idx;
+    //     return true;
+    // }
+
     default:
         return false;
     }
@@ -699,4 +843,99 @@ void http_conn::process()
         close_conn();
     }
     modfd(m_epollfd, m_sockfd, EPOLLOUT, m_TRIGMode);
+}
+
+//新增：文件上传功能代码
+void http_conn::init_file_upload_state()
+{
+    m_is_file_upload = false;
+    m_boundary.clear();
+    m_file_name.clear();
+    m_file_content.clear();
+}
+
+// 新增：解析 multipart/form-data 请求体，从 m_string 中提取文件名和内容
+http_conn::HTTP_CODE http_conn::parse_multipart_content()
+{
+    if (m_content_length <= 0 || m_string == NULL)
+        return BAD_REQUEST;
+
+    std::string body(m_string, m_content_length);
+
+    // 1. 找到起始 boundary
+    size_t start = body.find(m_boundary);
+    if (start == std::string::npos)
+        return BAD_REQUEST;
+    start += m_boundary.length();
+
+    // 2. 跳过 \r\n
+    if (start + 2 <= body.length() && body.substr(start, 2) == "\r\n")
+        start += 2;
+    else
+        return BAD_REQUEST;
+
+    // 3. 找到 part 头部结束位置（"\r\n\r\n"）
+    size_t header_end = body.find("\r\n\r\n", start);
+    if (header_end == std::string::npos)
+        return BAD_REQUEST;
+
+    // 4. 提取文件名
+    std::string part_header = body.substr(start, header_end - start);
+    size_t filename_pos = part_header.find("filename=\"");
+    if (filename_pos == std::string::npos)
+        return BAD_REQUEST;
+
+    size_t name_start = filename_pos + 10; // 跳过 "filename=\""
+    size_t name_end = part_header.find("\"", name_start);
+    if (name_end == std::string::npos)
+        return BAD_REQUEST;
+
+    m_file_name = part_header.substr(name_start, name_end - name_start);
+
+    // 安全处理：只保留文件名，丢弃路径
+    size_t slash = m_file_name.find_last_of("/\\");
+    if (slash != std::string::npos)
+        m_file_name = m_file_name.substr(slash + 1);
+
+    // 5. 提取文件内容
+    size_t content_start = header_end + 4;          // 跳过 "\r\n\r\n"
+    size_t content_end = body.find(m_boundary, content_start);
+    if (content_end == std::string::npos)
+        return BAD_REQUEST;
+
+    // 去掉末尾的 "\r\n"
+    if (content_end >= 2 && body.substr(content_end - 2, 2) == "\r\n")
+        content_end -= 2;
+
+    m_file_content = body.substr(content_start, content_end - content_start);
+    if (m_file_content.empty())
+        return BAD_REQUEST;
+
+    return GET_REQUEST;
+}
+
+// 新增：将 m_file_content 写入 ./upload/ 目录
+bool http_conn::save_uploaded_file()
+{
+    if (m_file_name.empty() || m_file_content.empty())
+        return false;
+
+    const char* upload_dir = "./upload/";
+    // 确保目录存在
+    if (access(upload_dir, F_OK) == -1)
+    {
+        if (mkdir(upload_dir, 0755) == -1)
+        {
+            return false;
+        }
+    }
+
+    std::string filepath = std::string(upload_dir) + m_file_name;
+    std::ofstream ofs(filepath.c_str(), std::ios::binary);
+    if (!ofs.is_open())
+        return false;
+
+    ofs.write(m_file_content.c_str(), m_file_content.size());
+    ofs.close();
+    return true;
 }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>注册失败</title>
+    <title>文件上传</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -19,7 +19,7 @@
             padding: 40px 36px;
             border-radius: 16px;
             box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
-            width: 360px;
+            width: 400px;
             max-width: 90vw;
             text-align: center;
         }
@@ -27,35 +27,34 @@
             font-size: 24px;
             font-weight: 700;
             color: #1a1a2e;
+            margin-bottom: 8px;
+        }
+        .card .subtitle {
+            color: #888;
+            font-size: 13px;
             margin-bottom: 24px;
         }
-        .form-group {
-            margin-bottom: 18px;
-            text-align: left;
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 12px;
+            padding: 36px 20px;
+            margin-bottom: 20px;
+            transition: border-color 0.3s, background 0.3s;
+            cursor: pointer;
         }
-        .form-group label {
-            display: block;
-            font-size: 13px;
-            color: #555;
-            margin-bottom: 6px;
-        }
-        .form-group input {
-            width: 100%;
-            padding: 11px 14px;
-            border: 1.5px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: border-color 0.25s;
-            outline: none;
-        }
-        .form-group input:focus {
+        .upload-area:hover {
             border-color: #4f6ef7;
-            box-shadow: 0 0 0 3px rgba(79, 110, 247, 0.1);
+            background: #f8faff;
+        }
+        .upload-area input[type="file"] {
+            display: block;
+            margin: 0 auto;
+            font-size: 14px;
+            color: #555;
         }
         .btn {
             width: 100%;
             padding: 13px 0;
-            margin-top: 8px;
             background: #4f6ef7;
             color: #fff;
             border: none;
@@ -68,32 +67,29 @@
         .btn:hover {
             background: #3b54d4;
             transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(79, 110, 247, 0.4);
         }
-        .error-msg {
-            margin-top: 20px;
-            padding: 10px;
-            background: #fff2f0;
-            color: #e74c3c;
-            border-radius: 8px;
+        .btn-back {
+            display: inline-block;
+            margin-top: 16px;
+            color: #999;
             font-size: 13px;
+            text-decoration: none;
         }
+        .btn-back:hover { color: #4f6ef7; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h2>📝 注册新账号</h2>
-        <form action="3CGISQL.cgi" method="post">
-            <div class="form-group">
-                <label>用户名</label>
-                <input type="text" name="user" placeholder="请输入用户名" required>
+        <h2>📁 文件上传</h2>
+        <p class="subtitle">选择文件上传至服务器（10MB 以内）</p>
+        <form action="/upload" method="post" enctype="multipart/form-data">
+            <div class="upload-area">
+                <input type="file" name="file" required>
             </div>
-            <div class="form-group">
-                <label>密码</label>
-                <input type="password" name="password" placeholder="请输入密码" required>
-            </div>
-            <button class="btn" type="submit">重新注册</button>
+            <button class="btn" type="submit">上 传</button>
         </form>
-        <div class="error-msg">⚠ 该用户名已被注册，请更换后重试</div>
+        <a href="javascript:history.back()" class="btn-back">← 返回上一页</a>
     </div>
 </body>
 </html>
