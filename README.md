@@ -30,7 +30,7 @@ Linux下C++轻量级Web服务器，在保留原项目 **线程池 + Epoll (ET) +
 目录
 -----
 
-| [概述](#概述) | [框架](#框架) | [Demo演示](#Demo演示) | [压力测试](#压力测试) | [快速运行](#快速运行) | [个性化运行](#个性化运行) | [致谢](#致谢) |
+| [概述](#概述) | [框架](#框架) | [界面展示](#界面展示) | [压力测试](#压力测试) | [快速运行](#快速运行) | [个性化运行](#个性化运行) | [致谢](#致谢) |
 |:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|
 
 
@@ -53,24 +53,39 @@ Linux下C++轻量级Web服务器，在保留原项目 **线程池 + Epoll (ET) +
 -------------
 <div align=center><img src="http://ww1.sinaimg.cn/large/005TJ2c7ly1ge0j1atq5hj30g60lm0w4.jpg" height="765"/> </div>
 
-Demo演示
+界面展示
 ----------
-> * 注册演示
+> * 首界面
 
-<div align=center><img src="http://ww1.sinaimg.cn/large/005TJ2c7ly1ge0iz0dkleg30m80bxjyj.gif" height="429"/> </div>
+<div align=center><img src="root/judge.png" height="429"/> </div>
 
-> * 登录演示
+> * 注册界面
 
-<div align=center><img src="https://github.com/qinguoyi/TinyWebServer/blob/master/root/login.gif" height="429"/> </div>
+<div align=center><img src="root/register.png" height="429"/> </div>
 
-> * 请求图片文件演示(6M)
+> * 登录界面
 
-<div align=center><img src="http://ww1.sinaimg.cn/large/005TJ2c7ly1ge0juxrnlfg30go07x4qr.gif" height="429"/> </div>
+<div align=center><img src="root/log.png" height="429"/> </div>
 
-> * 请求视频文件演示(39M)
+> * 欢迎界面
 
-<div align=center><img src="http://ww1.sinaimg.cn/large/005TJ2c7ly1ge0jtxie8ng30go07xb2b.gif" height="429"/> </div>
+<div align=center><img src="root/welcome.png" height="429"/> </div>
 
+> * 图片展示界面
+
+<div align=center><img src="root/pictrue.png" height="429"/> </div>
+
+> * 视频播放界面
+
+<div align=center><img src="root/video.png" height="429"/> </div>
+
+> * 文件上传界面
+
+<div align=center><img src="root/upload.png" height="429"/> </div>
+
+> * 文件上传成功界面
+
+<div align=center><img src="root/uploadSuccess.png" height="429"/> </div>
 
 压力测试
 -------------
